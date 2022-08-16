@@ -6,12 +6,11 @@ import grpc
 import sys
 
 from copy import copy
-from func_timeout import func_set_timeout
+from func_timeout import func_set_timeout, FunctionTimedOut
 
 from pisa.src.main.python import server_pb2, server_pb2_grpc
 from pathlib import Path
-from utils.general_utils import trim_string_optional
-
+from typing import Optional
 
 class EmptyInitialStateException(Exception):
     pass
@@ -33,6 +32,11 @@ class AvailableFactsTimeout(Exception):
 
 class _InactiveRpcError(Exception):
     pass
+
+def trim_string_optional(input_string: Optional[str]) -> Optional[str]:
+    if input_string is None:
+        return None
+    return " ".join(input_string.replace("\n", " ").split()).strip()
 
 
 def premise_name_to_possible_isabelle_formats(premise_name):
