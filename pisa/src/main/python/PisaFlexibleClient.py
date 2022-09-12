@@ -7,31 +7,40 @@ import sys
 
 from copy import copy
 from func_timeout import func_set_timeout, FunctionTimedOut
+from typing import List
 
 from pisa.src.main.python import server_pb2, server_pb2_grpc
 from pathlib import Path
 from typing import Optional
 
+
 class EmptyInitialStateException(Exception):
     pass
+
 
 class EnvInitFailedException(Exception):
     pass
 
+
 class ProceedToLineFailedException(Exception):
     pass
+
 
 class StepToTopLevelStateException(Exception):
     pass
 
+
 class AvailableFactsExtractionError(Exception):
     pass
+
 
 class AvailableFactsTimeout(Exception):
     pass
 
+
 class _InactiveRpcError(Exception):
     pass
+
 
 def trim_string_optional(input_string: Optional[str]) -> Optional[str]:
     if input_string is None:
@@ -225,7 +234,9 @@ class IsaFlexEnv:
         processed_global = process_raw_global_facts(_global)
         processed_local = process_raw_global_facts(_local)
         processed_global.update(processed_local)
-        processed_global = dict(filter(lambda key: not key.startswith("??"), processed_global.items()))
+        processed_global = dict(
+            filter(lambda key: not key[0].startswith("??"), processed_global.items())
+        )
 
         return processed_global
 
@@ -235,6 +246,49 @@ class IsaFlexEnv:
                 command=f"<find_thm> {tls_name} <find_thm> {thm_name}"
             )
         ).state
+
+    def translate_premise_names(self, isabelle_state, premise_names: List[str]):
+        """
+
+        Args:
+            premise_names: list of premise names of the form *_{n} for some natural n >= 1
+
+        Returns:
+            a corrected list of the names, where some _{n} are transformed to (n), as appropriate.
+            It is possible that both _{n} and (n) are returned for some names.
+
+        """
+        corrected_premise_names: List[str] = []
+        non_suspect_premises: List[str] = []
+        for premise in premise_names:
+            suffix = premise.split("_")[-1]
+            prefix = premise.rsplit("_",1)[0]
+            if suffix.isdigit():
+                premise_alternative = f"{prefix}({suffix})"
+                corrected_premise_names.append(premise_alternative)
+                corrected_premise_names.append(premise)
+            else:
+                non_suspect_premises.append(premise)
+
+        isa_steps = [f"using {premise}" for premise in corrected_premise_names]
+        successful_steps: List[str] = []
+        for step in isa_steps:
+
+            next_proof_state, _, done, _ = self.step_to_top_level_state(
+                step,
+                isabelle_state.proof_state_id,
+                -1,
+            )
+
+            next_proof_state_clean = trim_string_optional(next_proof_state)
+            step_correct = next_proof_state_clean not in [None,"","Step error"]
+            if step_correct:
+                successful_steps.append(step)
+
+        translated_premises = [step.split()[-1] for step in successful_steps]
+        sus_and_nonsus_premises = translated_premises + non_suspect_premises
+
+        return sus_and_nonsus_premises
 
     def destroy_isabelle(self):
         self.stub.IsabelleCommand(server_pb2.IsaCommand(command="exit"))
@@ -280,6 +334,7 @@ def parsed_json_to_env_and_dict(
         ),
         save_dict,
     )
+
 
 @func_set_timeout(300, allowOverride=True)
 def initialise_env(port, isa_path, theory_file_path=None, working_directory=None):
