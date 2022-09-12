@@ -260,7 +260,9 @@ class IsaFlexEnv:
         """
         corrected_premise_names: List[str] = []
         non_suspect_premises: List[str] = []
+
         for premise in premise_names:
+            corrected_premise_names.append(premise)
             suffix = premise.split("_")[-1]
             prefix = premise.rsplit("_",1)[0]
             if suffix.isdigit():
@@ -269,6 +271,7 @@ class IsaFlexEnv:
                 corrected_premise_names.append(premise)
             else:
                 non_suspect_premises.append(premise)
+
 
         isa_steps = [f"using {premise}" for premise in corrected_premise_names]
         successful_steps: List[str] = []
@@ -289,6 +292,7 @@ class IsaFlexEnv:
         sus_and_nonsus_premises = translated_premises + non_suspect_premises
 
         return sus_and_nonsus_premises
+
 
     def destroy_isabelle(self):
         self.stub.IsabelleCommand(server_pb2.IsaCommand(command="exit"))
