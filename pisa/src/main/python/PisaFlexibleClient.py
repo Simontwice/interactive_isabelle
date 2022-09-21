@@ -253,11 +253,14 @@ class IsaFlexEnv:
         except FunctionTimedOut:
             raise AvailableFactsTimeout
 
-    def all_facts_processed(self):
+    def all_facts_processed(self, dataset_extraction=False):
         _global = self.global_facts()
         _local = self.local_facts()
 
-        processed_global = process_raw_facts(_global)
+        if dataset_extraction:
+            processed_global = process_raw_global_facts(_global)
+        else:
+            processed_global = process_raw_facts(_global)
         processed_local = process_raw_facts(_local)
         processed_global.update(processed_local)
         processed_global = dict(
